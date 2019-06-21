@@ -1,0 +1,54 @@
+[
+    {
+        "versionId": "5cc92b81f7a818134243e32e",
+        "domain": "mq-status-api",
+        "fullDomain": "mq-status-api.us-e2.cloudhub.io",
+        "properties": {},
+        "propertiesOptions": {
+            "encryption.key": {
+                "secure": true
+            }
+        },
+        "status": "STARTED",
+        "workers": {
+            "type": {
+                "name": "Micro",
+                "weight": 0.1,
+                "cpu": "0.1 vCores",
+                "memory": "500 MB memory"
+            },
+            "amount": 1,
+            "remainingOrgWorkers": 2,
+            "totalOrgWorkers": 2
+        },
+        "lastUpdateTime": 1556687854936,
+        "fileName": "anypoint-monitoring-process-1.0.0-mule-application.jar",
+        "muleVersion": {
+            "version": "4.1.5",
+            "updateId": "5cc21dc22660b1134359ea95",
+            "endOfSupportDate": 1584662400000
+        },
+        "region": "us-east-2",
+        "persistentQueues": false,
+        "persistentQueuesEncryptionEnabled": false,
+        "persistentQueuesEncrypted": false,
+        "monitoringEnabled": true,
+        "monitoringAutoRestart": true,
+        "staticIPsEnabled": false,
+        "hasFile": true,
+        "secureDataGatewayEnabled": false,
+        "loggingNgEnabled": true,
+        "loggingCustomLog4JEnabled": false,
+        "insightsReplayDataRegion": "us-east-2",
+        "deploymentGroup": {
+            "id": "5ac685b0de9e5022ac802745",
+            "name": "US East (Ohio)"
+        },
+        "updateRuntimeConfig": false,
+        "trackingSettings": {
+            "trackingLevel": "DISABLED"
+        },
+        "logLevels": [],
+        "ipAddresses": []
+    }
+]

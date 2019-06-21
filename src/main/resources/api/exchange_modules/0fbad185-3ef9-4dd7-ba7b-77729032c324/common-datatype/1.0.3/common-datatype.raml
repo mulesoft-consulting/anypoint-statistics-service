@@ -1,0 +1,56 @@
+#%RAML 1.0 Library
+types: 
+  created:
+    
+    type: object
+    properties: 
+      message:
+        type: string
+      correlationId: 
+        type: string
+      timestamp:
+        type: datetime  
+
+  searchType:
+    type: object
+    properties: 
+      startDate:
+        type: string
+        required: false
+      endDate:
+        type: string
+        required: false 
+      rpmId:
+        type: string
+        required: false
+  watermarkType:
+    type: object
+    properties: 
+      watermark:
+        type: datetime-only
+        example: "2019-01-09T23:29:15" 
+  errorType:
+    type: object
+    properties: 
+        success?:
+          type: boolean
+        correlationId?:
+          type: string
+        timestamp?:
+          description: timestamp of error
+          type: datetime  
+        errorDetails?:
+          type: array
+          items:
+            type: object
+            properties:
+              errorCode?:
+                type: string
+                default: "500"
+                description: Error Code
+              message?: 
+                description: "Error description"
+                default: "Internal Server Error"
+              additionalInfo?:
+                type: object
+     

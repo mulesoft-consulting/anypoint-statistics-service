@@ -1,0 +1,146 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<types:mule xmlns:types="http://www.mulesoft.org/schema/mule/types">
+  <types:catalog>
+    <types:type name="all-destinations" format="json">
+      <types:shape format="weave" example="examples/all-destinations.json"><![CDATA[%dw 2.0
+type all_destinations = Array<{|
+  encrypted: Boolean, 
+  "type": String, 
+  queueId: String, 
+  fifo: Boolean, 
+  defaultTtl: Number {"typeId": "int"}, 
+  defaultLockTtl: Number {"typeId": "int"}, 
+  defaultDelay: Number {"typeId": "int"}
+|}> {"MetadataFormat": "json",
+"example": "[{\"encrypted\":false,\"type\":\"queue\",\"queueId\":\"my-first-queue\",\"fifo\":true,\"defaultTtl\":604800000,\"defaultLockTtl\":120000,\"defaultDelay\":0},{\"encrypted\":false,\"type\":\"queue\",\"queueId\":\"my-second-queue\",\"fifo\":true,\"defaultTtl\":604800000,\"defaultLockTtl\":120000,\"defaultDelay\":0}]"}
+
+]]></types:shape>
+    </types:type>
+    <types:type name="all-ch-apps" format="json">
+      <types:shape format="weave" example="examples/all-apps.json"><![CDATA[%dw 2.0
+type all_ch_apps = Array<{|
+  versionId: String, 
+  domain: String, 
+  fullDomain: String, 
+  properties: {|  |}, 
+  propertiesOptions: {| "encryption.key": {| secure: Boolean |} |}, 
+  status: String, 
+  workers: {|
+    "type": {|
+      name: String, 
+      weight: Number {"typeId": "double"}, 
+      cpu: String, 
+      memory: String
+    |}, 
+    amount: Number {"typeId": "int"}, 
+    remainingOrgWorkers: Number {"typeId": "int"}, 
+    totalOrgWorkers: Number {"typeId": "int"}
+  |}, 
+  lastUpdateTime: Number {"typeId": "double"}, 
+  fileName: String, 
+  muleVersion: {|
+    version: String, 
+    updateId: String, 
+    endOfSupportDate: Number {"typeId": "double"}
+  |}, 
+  region: String, 
+  persistentQueues: Boolean, 
+  persistentQueuesEncryptionEnabled: Boolean, 
+  persistentQueuesEncrypted: Boolean, 
+  monitoringEnabled: Boolean, 
+  monitoringAutoRestart: Boolean, 
+  staticIPsEnabled: Boolean, 
+  hasFile: Boolean, 
+  secureDataGatewayEnabled: Boolean, 
+  loggingNgEnabled: Boolean, 
+  loggingCustomLog4JEnabled: Boolean, 
+  insightsReplayDataRegion: String, 
+  deploymentGroup: {|
+    id: String, 
+    name: String
+  |}, 
+  updateRuntimeConfig: Boolean, 
+  trackingSettings: {| trackingLevel: String |}, 
+  logLevels: Array<Any>, 
+  ipAddresses: Array<Any>
+|}> {"MetadataFormat": "json",
+"example": "[{\"versionId\":\"5cc92b81f7a818134243e32e\",\"domain\":\"mq-status-api\",\"fullDomain\":\"mq-status-api.us-e2.cloudhub.io\",\"properties\":{},\"propertiesOptions\":{\"encryption.key\":{\"secure\":true}},\"status\":\"STARTED\",\"workers\":{\"type\":{\"name\":\"Micro\",\"weight\":0.1,\"cpu\":\"0.1 vCores\",\"memory\":\"500 MB memory\"},\"amount\":1,\"remainingOrgWorkers\":2,\"totalOrgWorkers\":2},\"lastUpdateTime\":1556687854936,\"fileName\":\"anypoint-monitoring-process-1.0.0-mule-application.jar\",\"muleVersion\":{\"version\":\"4.1.5\",\"updateId\":\"5cc21dc22660b1134359ea95\",\"endOfSupportDate\":1584662400000},\"region\":\"us-east-2\",\"persistentQueues\":false,\"persistentQueuesEncryptionEnabled\":false,\"persistentQueuesEncrypted\":false,\"monitoringEnabled\":true,\"monitoringAutoRestart\":true,\"staticIPsEnabled\":false,\"hasFile\":true,\"secureDataGatewayEnabled\":false,\"loggingNgEnabled\":true,\"loggingCustomLog4JEnabled\":false,\"insightsReplayDataRegion\":\"us-east-2\",\"deploymentGroup\":{\"id\":\"5ac685b0de9e5022ac802745\",\"name\":\"US East (Ohio)\"},\"updateRuntimeConfig\":false,\"trackingSettings\":{\"trackingLevel\":\"DISABLED\"},\"logLevels\":[],\"ipAddresses\":[]}]"}
+
+]]></types:shape>
+    </types:type>
+    <types:type name="app-dashboard" format="json">
+      <types:shape format="weave" example="examples/app-dashboard.json"><![CDATA[%dw 2.0
+type app_dashboard = {|
+  events: {|
+    "1556825299000": Number {"typeId": "int"}, 
+    "1556825359000": Number {"typeId": "int"}
+  |}, 
+  workerStatistics: Array<{|
+    id: String, 
+    statistics: {|
+      diskReadBytes: {|
+        "1556825280000": Number {"typeId": "double"}, 
+        "1556825340000": Number {"typeId": "double"}
+      |}, 
+      networkIn: {|
+        "1556825280000": Number {"typeId": "double"}, 
+        "1556825340000": Number {"typeId": "double"}
+      |}, 
+      memoryTotalUsed: {|
+        "1556825280000": Number {"typeId": "double"}, 
+        "1556825340000": Number {"typeId": "double"}
+      |}, 
+      memoryPercentageUsed: {|
+        "1556825280000": Number {"typeId": "double"}, 
+        "1556825340000": Number {"typeId": "double"}
+      |}, 
+      cpu: {|
+        "1556825280000": Number {"typeId": "double"}, 
+        "1556825340000": Number {"typeId": "double"}
+      |}, 
+      memoryTotalMax: Number {"typeId": "double"}, 
+      diskWriteBytes: {|
+        "1556825280000": Number {"typeId": "double"}, 
+        "1556825340000": Number {"typeId": "double"}
+      |}, 
+      networkOut: {|
+        "1556825280000": Number {"typeId": "double"}, 
+        "1556825340000": Number {"typeId": "double"}
+      |}
+    |}, 
+    ipAddress: String
+  |}>
+|} {"MetadataFormat": "json",
+"example": "{\"events\":{\"1556825299000\":0,\"1556825359000\":0},\"workerStatistics\":[{\"id\":\"i-0896f3149bd40794b\",\"statistics\":{\"diskReadBytes\":{\"1556825280000\":0.0,\"1556825340000\":0.0},\"networkIn\":{\"1556825280000\":3365.0,\"1556825340000\":12508.0},\"memoryTotalUsed\":{\"1556825280000\":2.04573376E8,\"1556825340000\":2.07857584E8},\"memoryPercentageUsed\":{\"1556825280000\":20.617846711938572,\"1556825340000\":20.9488443150388},\"cpu\":{\"1556825280000\":1.47540983606796,\"1556825340000\":1.49999999999636},\"memoryTotalMax\":9.9221504E8,\"diskWriteBytes\":{\"1556825280000\":0.0,\"1556825340000\":0.0},\"networkOut\":{\"1556825280000\":7486.0,\"1556825340000\":12093.0}},\"ipAddress\":\"13.57.241.13\"}]}"}
+
+]]></types:shape>
+    </types:type>
+  </types:catalog>
+  <types:enrichment select="#1310cdcc-383b-4553-8975-b6bdcb45a10c">
+    <types:processor-declaration>
+      <types:output-event>
+        <types:message>
+          <types:payload type="all-destinations"/>
+        </types:message>
+      </types:output-event>
+    </types:processor-declaration>
+  </types:enrichment>
+  <types:enrichment select="#18c15e45-5e22-4432-b916-c5941a49b177">
+    <types:processor-declaration>
+      <types:input-event>
+        <types:message>
+          <types:payload type="all-ch-apps"/>
+        </types:message>
+      </types:input-event>
+    </types:processor-declaration>
+  </types:enrichment>
+  <types:enrichment select="#3eaa9c8e-1fc2-41b9-8e74-60f2b3b698dc">
+    <types:processor-declaration>
+      <types:output-event>
+        <types:message>
+          <types:payload type="app-dashboard"/>
+        </types:message>
+      </types:output-event>
+    </types:processor-declaration>
+  </types:enrichment>
+</types:mule>

@@ -1,0 +1,34 @@
+{
+  "log": {
+    "severity": "ERROR",
+    "messageType":"CREATE_BUSINESS_ACCOUNT | UPDATE_BILLING_INFO || UPDATE_ENTITLEMENT_SET",
+    "eventType": "P2B_INTEGRATION_EVENT",
+    "environment": "DEV",
+    "correlationId": "XXXXXXXXX",
+    "objectType": "Account",
+    "appName": "zuora-sfdc-billing-address-sync",
+    "appId":"app8",
+    "rpmId": "12345",
+    "originSystem": "Zuora",
+    "targetSystem": "SFDC",
+    "timestamp": "2019-01-09T10:00:00",
+    "status": "SUCCESS, FAILED, IGNORED",
+    "statusCode" : "200,400,500",
+    "endpoint": "",
+    "httpMethod": "GET",
+    "responseBody": "{\n  \"message\": \"Hello world!\"\n}",
+    "requestBody": "{\n  \"message\": \"Hello world!\"\n}",
+    "errorMessage": "Error Message Description",
+    "orignalRequest":"{\n  \"message\": \"Hello world!\"\n}"
+  },
+  "loggingSystems": [
+    "salesforce",
+    "rdbms",
+    "insight"
+  ],
+  "email": {
+    "to": "abc@email.com",
+    "cc": "xyx@email.com",
+    "subject": "logging notication "
+  }
+}

@@ -1,0 +1,4 @@
+api:
+  base: "api"
+  path: "v1"
+  code: "anypoint-statistics"

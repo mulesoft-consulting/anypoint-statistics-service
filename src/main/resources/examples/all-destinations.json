@@ -1,0 +1,20 @@
+[
+    {
+        "encrypted": false,
+        "type": "queue",
+        "queueId": "my-first-queue",
+        "fifo": true,
+        "defaultTtl": 604800000,
+        "defaultLockTtl": 120000,
+        "defaultDelay": 0
+    },
+    {
+        "encrypted": false,
+        "type": "queue",
+        "queueId": "my-second-queue",
+        "fifo": true,
+        "defaultTtl": 604800000,
+        "defaultLockTtl": 120000,
+        "defaultDelay": 0
+    }
+]

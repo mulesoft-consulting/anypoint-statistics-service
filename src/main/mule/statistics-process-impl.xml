@@ -1,0 +1,405 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	  xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	 xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+	
+	<flow name="monitoring-process-impl" doc:id="c973474a-a62e-4fda-8ee1-13a54c53c167">
+		<flow-ref doc:name="get-auth-token" doc:id="628a613c-9b13-4b6d-abaa-4205645c1f05" name="get-auth-token" target="accessToken" />
+		<flow-ref doc:name="get-organization" doc:id="c67bf7d5-5745-4a53-96b7-426a0da4219d" name="get-organization" target="orgId" />
+		<set-variable value='#[now() &gt;&gt; "GMT"]' doc:name="Set Time In GMT" doc:id="75a1bb5b-957e-4f89-85a7-29766bfd970e" variableName="timeInGMT" />
+		<flow-ref doc:name="get-environment" doc:id="540df81f-d323-49e9-828f-42ffd0540dd2" name="get-environment" target="envId" />
+		<flow-ref doc:name="get-mq-status" doc:id="222381a5-6596-4ea6-a682-797539ed366b" name="get-mq-status" target="mqStats" />
+		<flow-ref doc:name="get-runtime-apps" doc:id="603c92ca-8c03-4ec9-9f23-a79f900686e1" name="get-runtime-apps" />
+		<flow-ref doc:name="get-app-schedulers-info" doc:id="9faef5e5-a00c-4d0b-bb5a-512a065f5d48" name="get-app-schedulers-info" target="schedulers"/>
+		<ee:transform doc:name="Final Response" doc:id="560d286c-dddb-451f-97c0-b8e4cf535345" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+var eventName = "MONITOR"
+fun formatNumbers(number) = number match  {
+    case is Null -> ''
+    case is Number -> number as String {format:"#.##"}
+    else -> number
+}
+fun toGB(size) = (((size/1024.0)/1024.0)/1024.0)
+
+---
+{
+    apps: payload map ((item, index) -> {
+        dateTime: vars.timeInGMT,
+        appName: item.appName,
+        memoryUsed: formatNumbers(item.memoryPercentageUsed.value) default '0' ++ '%' ,
+        maxMemory: formatNumbers((toGB(item.memoryTotalMax.value default 0))) default 0 ++ 'GB',
+        cpuUsed: formatNumbers(item.cpu.value) default '0' ++ '%',
+        cores: item.cores
+    }),
+    anypointMQ: vars.mqStats default []  map ((item, index) -> {
+        dateTime: vars.timeInGMT,
+        queueName: item.destination,
+        messsageSent: item.messagesSent.value,
+        inflightMessage: item.inflightMessages.value,
+        messageReceived: item.messagesReceived.value,
+        messagesAcked: item.messagesAcked.value
+    }),
+    schedulers: vars.schedulers default [] map ($ -'href')
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<sub-flow name="get-mq-status" doc:id="2fd1267a-86c2-4e26-89a6-bf59553f65e1" >
+				<http:request method="GET" doc:name="MQ Find All Destinations" doc:id="1310cdcc-383b-4553-8975-b6bdcb45a10c" config-ref="HTTP_Request_CloudHub" path="/mq/admin/api/v1/organizations/{organizationId}/environments/{envId}/regions/{region}/destinations">
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.accessToken
+}]]]></http:headers>
+			<http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"organizationId" : vars.orgId,
+	"envId" : vars.envId,
+	"region" : p('cloudhub.region')
+}]]]></http:uri-params>
+
+		</http:request>
+		<ee:transform doc:name="Filter Only Queues" doc:id="f6f6ec86-588f-4cac-a596-1e18c9b76619" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload filter ((item) -> item.queueId != null)]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[output application/json --- []]" doc:name="Init Mq Stats List" doc:id="97d9c467-7d29-4330-913c-13e3b42f45d6" variableName="mqStatsList"/>
+		<ee:transform doc:name="Search Range" doc:id="2d729f6f-7437-4672-b957-ef9482ba27db">
+			<ee:message>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="searchRange" ><![CDATA[%dw 2.0
+output application/json
+var timeInGMT= vars.timeInGMT default now() >> "GMT"
+---
+{
+    startDate: (timeInGMT - |PT14M|) as String {format: "E, dd MMM yyyy kk:mm:ss 'GMT'"},
+    endDate:  (timeInGMT - |PT1M|) as String {format: "E, dd MMM yyyy kk:mm:ss 'GMT'"}
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="MQ Stats Search Range" doc:id="8345ba81-2257-40fb-a3a1-3bdf6884a382" message="Search Range of MQ Stats  #[vars.searchRange]"/>
+		<foreach doc:name="For Each" doc:id="8065ae93-3f71-4d7f-8729-c3f6b91e12ea" collection="#[payload]">
+			<set-variable value="#[payload.queueId]" doc:name="Set Queue Name" doc:id="e4b821ef-e556-4714-bdc6-2da52da562b0" variableName="queueName"/>
+			<logger level="INFO" doc:name="Log MQ Consumption Dates" doc:id="6ddf5a5d-9354-4dac-af33-99b6f265cd43" message="Mq consumption for queue #[vars.queueName] " />
+			<try doc:name="Try" doc:id="40d185cc-a420-42ae-bf81-277347263888" >
+				<http:request method="GET" doc:name="MQ Status" doc:id="e3e3e939-680c-4834-9d35-5814fb26dde1" config-ref="HTTP_Request_CloudHub" path="/mq/stats/api/v1/organizations/{organizationId}/environments/{envId}/regions/{region}/queues/{queueId}">
+			<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.accessToken
+}]]]></http:headers>
+			<http:uri-params><![CDATA[#[output application/java
+---
+{
+	"organizationId" : vars.orgId,
+	"envId" : vars.envId,
+	"region" : p('cloudhub.region'),
+	"queueId" : vars.queueName
+}]]]></http:uri-params>
+			<http:query-params><![CDATA[#[output application/java
+---
+{
+	startDate : vars.searchRange.startDate,
+	endDate : vars.searchRange.endDate,
+	period : 360
+}]]]></http:query-params>
+		</http:request>
+				<ee:transform doc:name="Find MQ Status" doc:id="f26a679d-b931-403b-ad71-7f29dec9b202">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+fun findMaxValue (stats) = ((stats default [] filter $.value > 0) orderBy ((item) -> - item.value ))[0] default {value: 0}
+---
+
+{
+    destination : payload.destination,
+    messages: findMaxValue(payload.messages),
+    inflightMessages: findMaxValue(payload.inflightMessages),
+    messagesVisible:findMaxValue(payload.messagesVisible),
+    messagesSent: findMaxValue(payload.messagesSent),
+    messagesReceived: findMaxValue(payload.messagesReceived),
+    messagesAcked: findMaxValue(payload.messagesAcked)
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+				<set-variable value="#[output application/json --- vars.mqStatsList &lt;&lt; payload]" doc:name="Add MqStats" doc:id="3e4b2607-eef0-479f-ab5e-e68081988d9c" variableName="mqStatsList" />
+				<error-handler >
+					<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="cc31cceb-489f-4e70-9722-6147990fbba2" >
+						<logger level="ERROR" doc:name="Log Error" doc:id="b6254387-0bfc-4e6c-b607-af6030f81582" message="Error in retrieving MQ Stats #[error.description]"/>
+					</on-error-continue>
+				</error-handler>
+			</try>
+		</foreach>
+		<set-payload value="#[vars.mqStatsList]" doc:name="Set Payload" doc:id="d9bd77d6-e00c-4a18-be71-668fda87872c" mimeType="application/json"/>
+	</sub-flow>
+	<sub-flow name="get-environment" doc:id="582d8d81-8961-4a3d-a31e-b9e94c588e09" >
+		<http:request method="GET" doc:name="Get Env" doc:id="6be0f32f-2a27-46ed-940c-f35e0d211dc6" config-ref="HTTP_Request_CloudHub" path="/accounts/api/organizations/{orgId}/environments">
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.accessToken
+}]]]></http:headers>
+			<http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"orgId" : vars.orgId
+}]]]></http:uri-params>
+		</http:request>
+		<ee:transform doc:name="Transform Message" doc:id="af450002-d70b-4f29-ae56-efd5a40a48b9" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+
+---
+(payload.data filter ($.name == p('cloudhub.environmentName')))[0]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-payload value="#[payload.id]" doc:name="Set Payload" doc:id="af0267ce-b53c-4f5e-8180-e79e86a79ea7" />
+		<validation:is-not-null doc:name="Is not null" doc:id="5bcdd022-625e-41f2-901b-8d10c7071217" value="#[payload]" message="Unable to find Environment for org-name '${cloudhub.organizationName}', and environmentId ${cloudhub.environmentName}"/>
+		<logger level="INFO" doc:name="Found Env" doc:id="e40a30ab-97b5-4ca4-bdf1-3f890126fd72" message="Found Environment #[payload]"/>
+	</sub-flow>
+	<sub-flow name="get-auth-token" doc:id="8873c4df-2ddb-40f0-9e82-8217e8a4a3a7" >
+		<ee:transform doc:name="Login Payload" doc:id="9190a717-abb9-4d14-8321-3a0d24c6115f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	username: p('cloudhub.user'),
+	password: p('secure::cloudhub.password')
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<http:request method="POST" doc:name="Loging to AnyPoint" doc:id="eff95015-1732-44c6-a1b5-b7ba685b863f" config-ref="HTTP_Request_CloudHub" path="/accounts/login"/>
+		<ee:transform doc:name="Access Token" doc:id="fecb082a-8cf3-4798-8de3-5cc5078e07c1" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+'bearer ' ++ payload.'access_token']]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Log Got Token" doc:id="c16f9dcc-833e-439d-b6cc-8318247f4203" message="Got Token #[payload]"/>
+	</sub-flow>
+	<sub-flow name="get-organization" doc:id="0d1bfaa7-5bf5-41e0-95bd-0c0980e4bc8a" >
+		<http:request method="GET" doc:name="GET organizationId" doc:id="2e908b67-3018-401f-947e-752c2348b1f0" config-ref="HTTP_Request_CloudHub" path="/accounts/api/profile">
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.accessToken
+}]]]></http:headers>
+		</http:request>
+		<ee:transform doc:name="Find OrgId" doc:id="0a59285b-20cd-49b5-8218-bdfaeb3882b5" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+( payload.memberOfOrganizations filter ($.name == p('cloudhub.organizationName')) map {
+     orgId:  $.id
+})[0].orgId]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Log OrgId" doc:id="b676f035-25e5-4d5c-83d6-6682e4e6d2e8" message="Found orgId #[payload]"/>
+		<validation:is-not-null doc:id="5ca3dc07-877c-405d-91d6-906d31845cc7" value="#[payload]" message="Unable to find orgId for org-name '${cloudhub.organizationName}'" doc:name="Not Null OrgId"/>
+	</sub-flow>
+	<sub-flow name="get-app-schedulers-info" doc:id="fc4353bd-bade-4387-8996-bf63241562e9" >
+		<set-variable value="#[output application/json --- []]" doc:name="Set Scheduler List" doc:id="d0c64f08-034c-4bc1-a980-22f500b8b2d5" variableName="schedulers" mimeType="application/json"/>
+		<foreach doc:name="For Each" doc:id="68cf7a58-af57-40a8-806d-c39d8a9e3349" >
+			<set-variable value="#[payload.appName]" doc:name="Set AppName" doc:id="3ad926ff-ca57-4e77-a032-44550e5fff35" variableName="appName"/>
+			<logger level="INFO" doc:name="Logger" doc:id="09855f4a-037f-4886-bd36-ab3c9ddbf979" message="Finding Scheduler info for app #[payload.appName]"/>
+			<try doc:name="Try" doc:id="99d1b7a0-1f0e-4df5-8712-f5259b83d4fb" >
+				<http:request method="GET" doc:name="App Scheduler Stats" doc:id="14086151-c8c0-477f-aae1-9ccf06c81d8f" config-ref="HTTP_Request_CloudHub" path="/cloudhub/api/applications/{appName}/schedules">
+				<http:headers><![CDATA[#[output application/java
+---
+{
+	Authorization : vars.accessToken,
+	'X-ANYPNT-ORG-ID' : vars.orgId,
+	'X-ANYPNT-ENV-ID' : vars.envId
+}]]]></http:headers>
+				<http:uri-params><![CDATA[#[output application/java
+---
+{
+	"appName" : payload.appName
+}]]]></http:uri-params>
+
+			</http:request>
+				<ee:transform doc:name="Transform Message" doc:id="d7dfc485-5fb2-4001-b4e7-f81ceaa95323">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map ( {appName: vars.appName} ++ $)]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+				<set-variable value="#[output application/json --- vars.schedulers ++ payload]" doc:name="Add schedulers" doc:id="30429ed4-1059-4c90-9fd3-b2c85d371f54" variableName="schedulers" mimeType="application/json" />
+				<error-handler >
+					<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="476a8203-187a-4924-999e-2cc1f8ddcaf6" >
+						<logger level="ERROR" doc:name="Log Error" doc:id="b4dc70a2-f0ed-463e-93db-4afbb39c5285" message="Error in retrieving Scheduler Stats #[error.description]"/>
+					</on-error-continue>
+				</error-handler>
+			</try>
+		</foreach>
+		<set-payload value="#[vars.schedulers]" doc:name="Set Payload" doc:id="4c2bab51-eabf-4333-8bf7-2d3509d9b755" mimeType="application/json"/>
+	</sub-flow>
+	<sub-flow name="get-runtime-apps" doc:id="e742cef3-9815-4c81-ba1c-1aa990d3c479" >
+		<http:request method="GET" doc:name="Get Apps" doc:id="fe12f05c-3bb5-4d39-9fbf-2dbf8330cd4b" path="/cloudhub/api/v2/applications" config-ref="HTTP_Request_CloudHub">
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"X-ANYPNT-ORG-ID" : vars.orgId,
+	"X-ANYPNT-ENV-ID" : vars.envId,
+	"Authorization" : vars.accessToken
+}]]]></http:headers>
+		</http:request>
+		<ee:transform doc:name="Get App Names" doc:id="18c15e45-5e22-4432-b916-c5941a49b177" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="runtimeApps" ><![CDATA[%dw 2.0
+output application/json
+var timeInGMT= vars.timeInGMT default now() >> "GMT"
+---
+{
+	startDate: (timeInGMT - |PT3M|) as DateTime as String {format: "YYYY-MM-dd'T'HH:mm:ss.SSS'Z'"},
+	endDate: (timeInGMT - |PT1M|) as DateTime as String {format: "YYYY-MM-dd'T'HH:mm:ss.SSS'Z'"},
+	interval: 60000,
+	apps: payload map ((item) -> {
+		appName: item.domain,
+		status: item.status,
+		fullDomain: item.fullDomain,
+		status: item.status,
+		region: item.region,
+		muleVersion: item.muleVersion.version,
+		workers: item.workers
+	})
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<set-variable value="#[output application/json --- []]" doc:name="Initialize App Stats " doc:id="bd143b45-be9b-4e5c-9986-15da627ba020" variableName="appStats"/>
+		<logger level="INFO" doc:name="Logger" doc:id="32b30b86-2f7f-48f7-9487-9b1a55517840" message="Stats Search Range startDate :  #[vars.runtimeApps.startDate], endDate #[vars.runtimeApps.endDate]"/>
+		<foreach doc:name="For Each" doc:id="3704397c-0fa6-4bc4-80e4-9550771a45af" collection="#[vars.runtimeApps.apps]">
+			<set-variable value="#[payload.appName]" doc:name="Set App Name" doc:id="9cfc3477-9a69-4167-b9b7-1dc65b9fcb75" variableName="appName"/>
+			<set-variable value="#[payload]" doc:name="Set App Info" doc:id="673401d2-e1ec-49f1-8613-b64a6c58fd46" variableName="appInfo" mimeType="application/json"/>
+			<logger level="INFO" doc:name="Log AppName" doc:id="e23a2830-59f0-445a-bebd-8ef583bb78a8" message="Collecting Statistics for app #[payload.appName]"/>
+			<try doc:name="Try" doc:id="2d1d6edf-fb4f-4209-b031-6fb1ec87c27e" >
+				<http:request method="GET" doc:name="App Dashboard Stats" doc:id="3eaa9c8e-1fc2-41b9-8e74-60f2b3b698dc" config-ref="HTTP_Request_CloudHub" path="/cloudhub/api/v2/applications/{appName}/dashboardStats">
+				<http:headers><![CDATA[#[output application/java
+---
+{
+	Authorization : vars.accessToken,
+	'X-ANYPNT-ORG-ID' : vars.orgId,
+	'X-ANYPNT-ENV-ID' : vars.envId
+}]]]></http:headers>
+				<http:uri-params><![CDATA[#[output application/java
+---
+{
+	"appName" : payload.appName
+}]]]></http:uri-params>
+				<http:query-params><![CDATA[#[output application/java
+---
+{
+	"startDate" : vars.runtimeApps.startDate,
+	endDate : vars.runtimeApps.endDate,
+	interval : vars.runtimeApps.interval
+}]]]></http:query-params>
+			</http:request>
+				<error-handler >
+					<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="fdfa9346-bafb-4780-a9d0-51bad7897b56" >
+						<logger level="ERROR" doc:name="Log Error" doc:id="4f795886-9413-4caf-88a5-2cf2000cce4a" message="Error in retrieving App Stats #[error.description]"/>
+					</on-error-continue>
+				</error-handler>
+			</try>
+			<ee:transform doc:name="Transform Message" doc:id="20f1031a-2a71-4002-aa47-07256f9cd84b" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+var eventTimeStamp = ((payload.events filterObject ((value, key, index) -> value > 0)) pluck $$) match {
+    case x if(sizeOf(x) == 0)  -> 0
+    else -> $[0] 
+}
+var unitMap = {
+	"events": {
+		"unit": "number",
+		"description": "Total number of mule events occur within the specific interval"
+	},
+	"diskReadBytes": {
+		"unit": "bytes/minute",
+		"description": "Average disk read in bytes per minute within the specific interval"
+	},
+	"diskWriteBytes": {
+		"unit": "bytes/minute",
+		"description": "Average disk write in bytes per minute within the specific interval"
+	},
+	"networkIn": {
+		"unit": "bytes/minute",
+		"description": "Average networkIn in bytes per minute within the specific interval"
+	},
+	"networkOut": {
+		"unit": "bytes/minute",
+		"description": "Average networkOut in bytes per minute within the specific interval"
+	},
+	"memoryTotalUsed": {
+		"unit": "bytes",
+		"description": "Average memory used in bytes within the specific interval"
+	},
+	"memoryPercentageUsed": {
+		"unit": "percentage",
+		"description": "Average percentage of memory used within the specific interval"
+	},
+	"memoryTotalMax": {
+		"unit": "bytes",
+		"description": "Total memory in bytes of the worker. memoryTotalUsed/memoryTotalMax = memoryPercentageUsed",
+	},
+	"cpu": {
+		"unit": "percentage",
+		"description": "Average percentage of cpu used within the specific interval"
+	}
+}
+---
+{
+	appName: vars.appName default '',
+	cores: vars.appInfo.workers.'type'.cpu,
+	events: {
+		value: payload.events[eventTimeStamp as String] default 0,
+		unit: "number"
+	},
+	(payload.workerStatistics reduce ((item, acc = {}) -> acc ++ {
+		(item.statistics mapObject ((v, key) -> {
+			(key): {
+				value: (v match {
+		                case is Null -> 0
+		                case is Object -> max(v pluck $) default 0
+		                else -> v
+		            }),
+
+				unitDescription: unitMap[key as String].description default '',
+				unit: unitMap[key as String].unit default ''
+			}
+		}))
+	}))
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<set-variable value="#[output application/json --- vars.appStats &lt;&lt; payload]" doc:name="Set Add Stats" doc:id="7a2f5474-ae95-46ac-a0e8-8a4a635b15a0" variableName="appStats"/>
+		</foreach>
+		<set-payload value="#[vars.appStats]" doc:name="Set Payload" doc:id="9e62e553-937a-4b76-a989-468da220fe93" mimeType="application/json"/>
+	</sub-flow>
+</mule>
