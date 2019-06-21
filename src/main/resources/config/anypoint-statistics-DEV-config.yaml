@@ -5,11 +5,11 @@ https:
   port: "8082"
   keystore:
     path: "certificates/keystore.jks"
-    password: "![D4+v1CUytkrdHeMLuFlD0w==]"
+    password: "![4FLZGGedfkG1hST81p5mnA==]"
 #---------------------------------------   
 basicAuth:
   adminUser: "admin"
-  adminPassword: "![72nmzOUYZqR2i2p0sKLJRQ==]" #admin
+  adminPassword: "[9DRo3w1QE7qrOA42aI0S1g==]" #admin
 #--------------------------------------- 
 # Monitoring configuration
 #---------------------------------------
